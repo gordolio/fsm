@@ -26,6 +26,8 @@
  OTHER DEALINGS IN THE SOFTWARE.
 */
 
+function sign(x) { return (x >> 31) + (x > 0 ? 1 : 0); }
+
 function Link(a, b) {
     this.nodeA = a;
     this.nodeB = b;
@@ -78,8 +80,8 @@ Link.prototype.getEndPointsAndCircle = function() {
     var circle = circleFromThreePoints(this.nodeA.x, this.nodeA.y, this.nodeB.x, this.nodeB.y, anchor.x, anchor.y);
     var isReversed = (this.perpendicularPart > 0);
     var reverseScale = isReversed ? 1 : -1;
-    var startAngle = Math.atan2(this.nodeA.y - circle.y, this.nodeA.x - circle.x) - reverseScale * nodeRadius / circle.radius;
-    var endAngle = Math.atan2(this.nodeB.y - circle.y, this.nodeB.x - circle.x) + reverseScale * nodeRadius / circle.radius;
+    var startAngle = Math.atan2(this.nodeA.y - circle.y, this.nodeA.x - circle.x) - reverseScale * this.radius / circle.radius;
+    var endAngle = Math.atan2(this.nodeB.y - circle.y, this.nodeB.x - circle.x) + reverseScale * this.radius / circle.radius;
     var startX = circle.x + circle.radius * Math.cos(startAngle);
     var startY = circle.y + circle.radius * Math.sin(startAngle);
     var endX = circle.x + circle.radius * Math.cos(endAngle);
@@ -184,6 +186,9 @@ function Node(x, y) {
     this.mouseOffsetY = 0;
     this.nodeType = CIRCLE_NODE_T;
     this.text = '';
+    this.radius = 30;
+    this.width  = 60;
+    this.height = 60;
 }
 
 Node.prototype.setMouseStart = function(x, y) {
@@ -196,11 +201,22 @@ Node.prototype.setAnchorPoint = function(x, y) {
     this.y = y + this.mouseOffsetY;
 };
 
+Node.prototype.setNewRadius = function (x,y) {
+    var dx = this.x - x;
+    var dy = this.y - y;
+    var scale = Math.abs(1.0 + sign(dx) * sign(dy) * (Math.sqrt(dx * dx + dy * dy) / 100.0));
+    this.radius = Math.max(5.0, 30 * scale);
+
+    // maybe make changes to only one dimension at a time ?
+    this.width  = Math.max(5.0, 60 * Math.abs(1.0 + sign(dx) * (dx / 100.0)));
+    this.height = Math.max(5.0, 60 * Math.abs(1.0 + sign(dy) * (dy / 100.0)));
+}
+
 Node.prototype.draw = function(c) {
     if (this.nodeType == CIRCLE_NODE_T || this.nodeType == ACCEPT_STATE_NODE_T) {
         // draw the circle
         c.beginPath();
-        c.arc(this.x, this.y, nodeRadius, 0, 2 * Math.PI, false);
+        c.arc(this.x, this.y, this.radius, 0, 2 * Math.PI, false);
         c.stroke();
 
         // draw the text
@@ -209,12 +225,12 @@ Node.prototype.draw = function(c) {
         // draw a double circle for an accept state
         if (this.nodeType == ACCEPT_STATE_NODE_T) {
             c.beginPath();
-            c.arc(this.x, this.y, nodeRadius - 6, 0, 2 * Math.PI, false);
+            c.arc(this.x, this.y, this.radius - 6, 0, 2 * Math.PI, false);
             c.stroke();
         }
     } else if (this.nodeType == RECTANGE_NODE_T) {
         c.beginPath();
-        c.strokeRect(this.x - nodeRadius, this.y - nodeRadius, 2 * nodeRadius, 2 * nodeRadius);
+        c.strokeRect(this.x - this.width / 2.0, this.y - this.height / 2.0, this.width, this.height);
         c.stroke();
         // draw the text
         drawText(c, this.text, this.x, this.y, null, selectedObject == this);
@@ -224,15 +240,63 @@ Node.prototype.draw = function(c) {
 Node.prototype.closestPointOnCircle = function(x, y) {
     var dx = x - this.x;
     var dy = y - this.y;
-    var scale = Math.sqrt(dx * dx + dy * dy);
-    return {
-        'x': this.x + dx * nodeRadius / scale,
-        'y': this.y + dy * nodeRadius / scale,
-    };
+    var distance = Math.sqrt(dx * dx + dy * dy);
+    if (this.nodeType == RECTANGE_NODE_T) {
+        var dy = x - this.x,
+            dx = y - this.y;
+        // angle is 0  when point is to the right of rectangle,
+        // angle is pi when point is to left of rectangle.
+        var angle = (2.0 * Math.PI + Math.atan2(
+            dy,
+            dx
+        ) - (Math.PI / 2.0)) % (2.0 * Math.PI);
+        var tan = Math.tan(angle);
+        var h = distance * Math.sin(angle);
+        var w = distance * Math.cos(angle);
+
+        if (h > (this.height / 2.0)) {
+            h = this.height / 2.0;
+            // tan = opposite / adjacent
+            // w is adjacent
+            w = (1.0 / tan) * h;
+        } else if (h <= -(this.height / 2.0)) {
+            h = -this.height / 2.0;
+            // tan = opposite / adjacent
+            // w is adjacent
+            w = (1.0 / tan) * h;
+
+        } else if (w > (this.width / 2.0)) {
+            w = this.width / 2.0;
+            // tan = opposite / adjancent
+            // h is opposite
+            h = tan * w;
+        } else if (w <= -(this.width / 2.0)) {
+            w = -this.width / 2.0;
+            // tan = opposite / adjancent
+            // h is opposite
+            h = tan * w;
+        } else {
+            // point is inside the rectangle
+            return {
+                'x': x,
+                'y': y,
+            };
+        }
+        return {
+            'x': this.x + w,
+            'y': this.y - h,
+        };
+    } else {
+
+        return {
+            'x': this.x + dx * this.radius / distance,
+            'y': this.y + dy * this.radius / distance,
+        };
+    }
 };
 
 Node.prototype.containsPoint = function(x, y) {
-    return (x - this.x)*(x - this.x) + (y - this.y)*(y - this.y) < nodeRadius*nodeRadius;
+    return (x - this.x)*(x - this.x) + (y - this.y)*(y - this.y) < this.radius*this.radius;
 };
 
 function SelfLink(node, mouse) {
@@ -261,9 +325,9 @@ SelfLink.prototype.setAnchorPoint = function(x, y) {
 };
 
 SelfLink.prototype.getEndPointsAndCircle = function() {
-    var circleX = this.node.x + 1.5 * nodeRadius * Math.cos(this.anchorAngle);
-    var circleY = this.node.y + 1.5 * nodeRadius * Math.sin(this.anchorAngle);
-    var circleRadius = 0.75 * nodeRadius;
+    var circleX = this.node.x + 1.5 * this.node.radius * Math.cos(this.anchorAngle);
+    var circleY = this.node.y + 1.5 * this.node.radius * Math.sin(this.anchorAngle);
+    var circleRadius = 0.75 * this.node.radius;
     var startAngle = this.anchorAngle - Math.PI * 0.8;
     var endAngle = this.anchorAngle + Math.PI * 0.8;
     var startX = circleX + circleRadius * Math.cos(startAngle);
@@ -689,7 +753,6 @@ function resetCaret() {
 }
 
 var canvas;
-var nodeRadius = 30;
 var nodes = [];
 var links = [];
 
@@ -698,7 +761,8 @@ var snapToPadding = 6; // pixels
 var hitTargetPadding = 6; // pixels
 var selectedObject = null; // either a Link or a Node
 var currentLink = null; // a Link
-var movingObject = false;
+var movingObject = false,
+    resizingObject = false;
 var originalClick;
 
 function drawUsing(c) {
@@ -766,12 +830,19 @@ window.onload = function() {
     canvas.onmousedown = function(e) {
         var mouse = crossBrowserRelativeMousePos(e);
         selectedObject = selectObject(mouse.x, mouse.y);
-        movingObject = false;
-        originalClick = mouse;
+        movingObject   = false;
+        resizingObject = false;
+        originalClick  = mouse;
 
         if(selectedObject != null) {
             if(shift && selectedObject instanceof Node) {
                 currentLink = new SelfLink(selectedObject, mouse);
+            } else if (alt && selectedObject instanceof Node) {
+                resizingObject = true;
+                deltaMouseX = deltaMouseY = 0;
+                if(selectedObject.setMouseStart) {
+                    selectedObject.setMouseStart(mouse.x, mouse.y);
+                }
             } else {
                 movingObject = true;
                 deltaMouseX = deltaMouseY = 0;
@@ -846,10 +917,16 @@ window.onload = function() {
             }
             draw();
         }
+
+        if (resizingObject) {
+            selectedObject.setNewRadius(mouse.x, mouse.y);
+            draw();
+        }
     };
 
     canvas.onmouseup = function(e) {
-        movingObject = false;
+        movingObject   = false;
+        resizingObject = false;
 
         if(currentLink != null) {
             if(!(currentLink instanceof TemporaryLink)) {
@@ -863,13 +940,16 @@ window.onload = function() {
     };
 }
 
-var shift = false;
+var shift = false,
+    alt = false;
 
 document.onkeydown = function(e) {
     var key = crossBrowserKey(e);
 
     if(key == 16) {
         shift = true;
+    } else if (key == 18) {
+        alt   = true;
     } else if(!canvasHasFocus()) {
         // don't read keystrokes when other things have focus
         return true;
@@ -902,9 +982,10 @@ document.onkeydown = function(e) {
 
 document.onkeyup = function(e) {
     var key = crossBrowserKey(e);
-
     if(key == 16) {
         shift = false;
+    } else if (key == 18) {
+        alt = false;
     }
 };
 
@@ -1030,6 +1111,9 @@ function restoreBackup() {
             var backupNode = backup.nodes[i];
             var node = new Node(backupNode.x, backupNode.y);
             node.nodeType = backupNode.nodeType;
+            node.radius = backupNode.radius || 30.0;
+            node.width  = backupNode.width  || 60.0;
+            node.height = backupNode.height || 60.0;
             node.text = backupNode.text;
             nodes.push(node);
         }
@@ -1076,7 +1160,10 @@ function saveBackup() {
             'x': node.x,
             'y': node.y,
             'text': node.text,
-            'nodeType': node.nodeType
+            'nodeType': node.nodeType,
+            'radius': node.radius,
+            'width': node.width,
+            'height': node.height
         };
         backup.nodes.push(backupNode);
     }
