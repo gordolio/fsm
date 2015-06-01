@@ -1,10 +1,10 @@
-# Finite State Machine Designer
+# Diagram Designer
 
-http://madebyevan.com/fsm/
+![Screenshot](images/main.png)
 
-Originally created by Evan Wallace.
+Design diagrams using drag and drog. Export to png, latex, and svg.
 
-Now supports rectangles, triangles, etc...
+[http://madebyevan.com/fsm/](Originally created by Evan Wallace), with slight modifications by Jonathan Raiman.
 
 ### Usage
 
