@@ -4,7 +4,7 @@
 
 Design diagrams using drag and drog. Export to png, latex, and svg.
 
-[http://madebyevan.com/fsm/](Originally created by Evan Wallace), with slight modifications by Jonathan Raiman.
+[Created by Evan Wallace](http://madebyevan.com/fsm/), with slight modifications by Jonathan Raiman.
 
 ### Usage
 
