@@ -177,7 +177,8 @@ Link.prototype.containsPoint = function(x, y) {
 var CIRCLE_NODE_T       = 0,
     ACCEPT_STATE_NODE_T = 1,
     RECTANGE_NODE_T     = 2,
-    MAX_NODE_T          = 3;
+    TRIANGLE_NODE_T     = 3,
+    MAX_NODE_T          = 4;
 
 function Node(x, y) {
     this.x = x;
@@ -233,6 +234,15 @@ Node.prototype.draw = function(c) {
         c.strokeRect(this.x - this.width / 2.0, this.y - this.height / 2.0, this.width, this.height);
         c.stroke();
         // draw the text
+        drawText(c, this.text, this.x, this.y, null, selectedObject == this);
+    } else if (this.nodeType == TRIANGLE_NODE_T) {
+        c.beginPath();
+        c.moveTo(this.x, this.y  - this.height * 0.666);
+        c.lineTo(this.x + this.width / 2.0, this.y + this.height * 0.3333);
+        c.lineTo(this.x - this.width / 2.0, this.y + this.height * 0.3333);
+        c.lineTo(this.x, this.y  - this.height * 0.666);
+        c.stroke();
+
         drawText(c, this.text, this.x, this.y, null, selectedObject == this);
     }
 };
