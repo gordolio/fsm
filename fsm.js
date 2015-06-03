@@ -176,7 +176,7 @@ Link.prototype.containsPoint = function(x, y) {
 
 var CIRCLE_NODE_T       = 0,
     ACCEPT_STATE_NODE_T = 1,
-    RECTANGE_NODE_T     = 2,
+    RECTANGLE_NODE_T     = 2,
     TRIANGLE_NODE_T     = 3,
     TEXT_NODE_T         = 4,
     MAX_NODE_T          = 5;
@@ -193,6 +193,18 @@ function Node(x, y) {
     this.height = 60;
 }
 
+Node.prototype.clone = function () {
+    var clone = new Node(this.x, this.y);
+
+    clone.nodeType = this.nodeType;
+    clone.text = this.text;
+    clone.radius = this.radius;
+    clone.width = this.width;
+    clone.height = this.height;
+
+    return clone;
+}
+
 Node.prototype.rightSide = function () {
     return this.x + this.rightOffset();
 }
@@ -200,13 +212,35 @@ Node.prototype.leftSide = function () {
     return this.x + this.leftOffset();
 }
 Node.prototype.rightOffset = function () {
-    if (this.nodeType == TEXT_NODE_T || this.nodeType == RECTANGE_NODE_T) {
+    if (this.nodeType == TEXT_NODE_T || this.nodeType == RECTANGLE_NODE_T) {
         return this.width / 2.0;
     }
     return this.radius;
 }
 Node.prototype.leftOffset = function () {
     return -this.rightOffset();
+}
+
+Node.prototype.topSide = function () {
+    return this.y + this.topOffset();
+}
+Node.prototype.bottomSide = function () {
+    return this.y + this.bottomOffset();
+}
+Node.prototype.topOffset = function () {
+    if (this.nodeType == TRIANGLE_NODE_T) {
+        return -this.height * 0.6666;
+    }
+    return -this.bottomOffset();
+}
+Node.prototype.bottomOffset = function () {
+    if (this.nodeType == TEXT_NODE_T || this.nodeType == RECTANGLE_NODE_T) {
+        return this.height / 2.0;
+    }
+    if (this.nodeType == TRIANGLE_NODE_T) {
+        return this.height * 0.3333;
+    }
+    return this.radius;
 }
 
 Node.prototype.updateTextWidth = function () {
@@ -253,7 +287,7 @@ Node.prototype.draw = function(c) {
             c.arc(this.x, this.y, this.radius - 6, 0, 2 * Math.PI, false);
             c.stroke();
         }
-    } else if (this.nodeType == RECTANGE_NODE_T) {
+    } else if (this.nodeType == RECTANGLE_NODE_T) {
         c.beginPath();
         c.strokeRect(this.x - this.width / 2.0, this.y - this.height / 2.0, this.width, this.height);
         c.stroke();
@@ -294,7 +328,7 @@ Node.prototype.closestPointOnCircle = function(x, y) {
     var dy = y - this_y;
     var distance = Math.sqrt(dx * dx + dy * dy);
 
-    if (this.nodeType == RECTANGE_NODE_T || this.nodeType == TEXT_NODE_T) {
+    if (this.nodeType == RECTANGLE_NODE_T || this.nodeType == TEXT_NODE_T) {
         var dx = x - this_x,
             dy = y - this_y;
         // angle is 0  when point is to the right of rectangle,
@@ -349,7 +383,40 @@ Node.prototype.closestPointOnCircle = function(x, y) {
 };
 
 Node.prototype.containsPoint = function(x, y) {
-    return (x - this.x)*(x - this.x) + (y - this.y)*(y - this.y) < this.radius*this.radius;
+    if (this.nodeType == CIRCLE_NODE_T || this.nodeType == ACCEPT_STATE_NODE_T) {
+        return (x - this.x)*(x - this.x) + (y - this.y)*(y - this.y) < this.radius*this.radius;
+    } else if (this.nodeType == TEXT_NODE_T || this.nodeType == RECTANGLE_NODE_T) {
+        if ( x >= this.x - this.width / 2.0 && x <= this.x + this.width / 2.0) {
+            if (y > this.y - this.height / 2.0 && y <= this.y + this.height / 2.0) {
+                return true;
+            }
+        }
+        return false;
+    } else if (this.nodeType == TRIANGLE_NODE_T) {
+        if (y > this.y + this.height * 0.333 || y < this.y - this.height * 0.6666) {
+            return false;
+        }
+        if (x < this.x && x >= this.x - this.width / 2.0) {
+            var dx = x - (this.x - this.width  / 2.0),
+                dy = (this.y + this.height * 0.3333) - y;
+            if ((dy / dx) < this.height / (this.width / 2.0)) {
+                return true;
+            }
+            return false;
+        } else if (x > this.x && x <= this.x + this.width / 2.0) {
+            var dx = (this.x - x + this.width  / 2.0),
+                dy = (this.y + this.height * 0.3333) - y;
+            if ((dy / dx) < this.height / (this.width / 2.0)) {
+                return true;
+            }
+            return false;
+        }
+        return false;
+    }
+
+
+
+    
 };
 
 function SelfLink(node, mouse) {
@@ -820,7 +887,8 @@ var hitTargetPadding = 6; // pixels
 var selectedObject = null; // either a Link or a Node
 var currentLink = null; // a Link
 var movingObject = false,
-    resizingObject = false;
+    resizingObject = false,
+    alt_resizes = false;
 var originalClick;
 
 function drawUsing(c) {
@@ -867,80 +935,60 @@ function selectObject(x, y) {
 }
 
 function snapNode(node) {
-    var min_x_snap = null, new_x = null, new_y = null;
+    var min_x_snap = null,
+        min_y_snap = null,
+        new_dx     = null,
+        new_dy     = null;
 
     for(var i = 0; i < nodes.length; i++) {
-        if(nodes[i] == node) continue;
+        if (nodes[i] == node) continue;
 
-        var dx = Math.abs(node.x - nodes[i].x);
+        var deltaxs = [
+            nodes[i].x           - node.x,
+            nodes[i].leftSide()  - node.x,
+            nodes[i].rightSide() - node.x,
+            nodes[i].leftSide()  - node.rightSide(),
+            nodes[i].rightSide() - node.leftSide(),
+            nodes[i].rightSide() - node.rightSide(),
+            nodes[i].leftSide()  - node.leftSide()
+        ];
 
-        if(dx < snapToPadding) {
-            if (min_x_snap === null) {
-                min_x_snap = dx;
-                new_x = nodes[i].x;
-            } else if (dx < min_x_snap) {
-                min_x_snap = dx;
-                new_x = nodes[i].x;
+        for (var deltaxs_idx = 0; deltaxs_idx < deltaxs.length;deltaxs_idx++) {
+            var delta_x = Math.abs(deltaxs[deltaxs_idx]);
+            if (delta_x < snapToPadding) {
+                if (min_x_snap === null) {
+                    min_x_snap = delta_x;
+                    new_dx = deltaxs[deltaxs_idx];
+                } else if (delta_x < min_x_snap) {
+                    min_x_snap = delta_x;
+                    new_dx = deltaxs[deltaxs_idx];
+                }
             }
         }
 
-        dx = Math.abs(node.rightSide() - nodes[i].leftSide());
+        var deltays = [
+            nodes[i].y             - node.y,
+            nodes[i].bottomSide()  - node.topSide(),
+            nodes[i].topSide()     - node.bottomSide(),
+            nodes[i].topSide()     - node.topSide(),
+            nodes[i].bottomSide()  - node.bottomSide()
+        ];
 
-        if(dx < snapToPadding) {
-            if (min_x_snap === null) {
-                min_x_snap = dx;
-                new_x = nodes[i].leftSide() - node.rightOffset();
-            } else if (dx < min_x_snap) {
-                min_x_snap = dx;
-                new_x = nodes[i].rightSide() - node.rightOffset();
+        for (var deltays_idx = 0; deltays_idx < deltays.length;deltays_idx++) {
+            var delta_y = Math.abs(deltays[deltays_idx]);
+            if (delta_y < snapToPadding) {
+                if (min_y_snap === null) {
+                    min_y_snap = delta_y;
+                    new_dy = deltays[deltays_idx];
+                } else if (delta_y < min_y_snap) {
+                    min_y_snap = delta_y;
+                    new_dy = deltays[deltays_idx];
+                }
             }
-        }
-
-        dx = Math.abs(node.leftSide() - nodes[i].rightSide());
-
-        if(dx < snapToPadding) {
-            if (min_x_snap === null) {
-                min_x_snap = dx;
-                new_x = nodes[i].leftSide() - node.leftOffset();
-            } else if (dx < min_x_snap) {
-                min_x_snap = dx;
-                new_x = nodes[i].leftSide() - node.leftOffset();
-            }
-        }
-
-        dx = Math.abs(node.rightSide() - nodes[i].rightSide());
-
-        if(dx < snapToPadding) {
-            if (min_x_snap === null) {
-                min_x_snap = dx;
-                new_x = nodes[i].rightSide() - node.rightOffset();
-            } else if (dx < min_x_snap) {
-                min_x_snap = dx;
-                new_x = nodes[i].rightSide() - node.rightOffset();
-            }
-        }
-
-        dx = Math.abs(node.leftSide() - nodes[i].leftSide());
-
-        if(dx < snapToPadding) {
-            if (min_x_snap === null) {
-                min_x_snap = dx;
-                new_x = nodes[i].leftSide() - node.leftOffset();
-            } else if (dx < min_x_snap) {
-                min_x_snap = dx;
-                new_x = nodes[i].leftSide() - node.leftOffset();
-            }
-        }
-
-        if(Math.abs(node.y - nodes[i].y) < snapToPadding) {
-            new_y = nodes[i].y;
         }
     }
-    if (new_y !== null) node.y = new_y;
-    if (new_x !== null) {
-
-        node.x = new_x;
-    }
+    if (new_dy !== null) node.y = node.y + new_dy;
+    if (new_dx !== null) node.x = node.x + new_dx;
 }
 
 window.onload = function() {
@@ -958,12 +1006,21 @@ window.onload = function() {
         if(selectedObject != null) {
             if(shift && selectedObject instanceof Node) {
                 currentLink = new SelfLink(selectedObject, mouse);
-            } else if (alt && selectedObject instanceof Node) {
+            } else if (alt_resizes && alt && selectedObject instanceof Node) {
                 resizingObject = true;
+                deltaMouseX = deltaMouseY = 0;
+                if (selectedObject.setMouseStart) {
+                    selectedObject.setMouseStart(mouse.x, mouse.y);
+                }
+            } else if (!alt_resizes && alt && selectedObject instanceof Node) {
+                selectedObject = selectedObject.clone();
+                nodes.push(selectedObject);
+                movingObject = true;
                 deltaMouseX = deltaMouseY = 0;
                 if(selectedObject.setMouseStart) {
                     selectedObject.setMouseStart(mouse.x, mouse.y);
                 }
+                resetCaret();
             } else {
                 movingObject = true;
                 deltaMouseX = deltaMouseY = 0;
