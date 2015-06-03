@@ -193,6 +193,22 @@ function Node(x, y) {
     this.height = 60;
 }
 
+Node.prototype.rightSide = function () {
+    return this.x + this.rightOffset();
+}
+Node.prototype.leftSide = function () {
+    return this.x + this.leftOffset();
+}
+Node.prototype.rightOffset = function () {
+    if (this.nodeType == TEXT_NODE_T || this.nodeType == RECTANGE_NODE_T) {
+        return this.width / 2.0;
+    }
+    return this.radius;
+}
+Node.prototype.leftOffset = function () {
+    return -this.rightOffset();
+}
+
 Node.prototype.updateTextWidth = function () {
     var c = canvas.getContext('2d');
     c.font = '20px "Times New Romain", serif';
@@ -257,11 +273,11 @@ Node.prototype.draw = function(c) {
             var prev_strokestyle = c.strokeStyle;
             c.strokeStyle = 'grey';
             c.beginPath();
-            c.strokeRect(this.x, this.y - this.height / 2.0, this.width, this.height);
+            c.strokeRect(this.x - this.width / 2.0, this.y - this.height / 2.0, this.width, this.height);
             c.stroke();
             c.strokeStyle = prev_strokestyle;
         }
-        drawText(c, this.text, this.x, this.y, null, selectedObject == this, false);
+        drawText(c, this.text, this.x, this.y, null, selectedObject == this, true);
     }
 };
 
@@ -270,9 +286,9 @@ Node.prototype.closestPointOnCircle = function(x, y) {
     var this_x = this.x,
         this_y = this.y;
 
-    if (this.nodeType == TEXT_NODE_T) {
+    /*if (this.nodeType == TEXT_NODE_T) {
         this_x = this_x + this.width / 2.0;
-    }
+    }*/
 
     var dx = x - this_x;
     var dy = y - this_y;
@@ -851,16 +867,79 @@ function selectObject(x, y) {
 }
 
 function snapNode(node) {
+    var min_x_snap = null, new_x = null, new_y = null;
+
     for(var i = 0; i < nodes.length; i++) {
         if(nodes[i] == node) continue;
 
-        if(Math.abs(node.x - nodes[i].x) < snapToPadding) {
-            node.x = nodes[i].x;
+        var dx = Math.abs(node.x - nodes[i].x);
+
+        if(dx < snapToPadding) {
+            if (min_x_snap === null) {
+                min_x_snap = dx;
+                new_x = nodes[i].x;
+            } else if (dx < min_x_snap) {
+                min_x_snap = dx;
+                new_x = nodes[i].x;
+            }
+        }
+
+        dx = Math.abs(node.rightSide() - nodes[i].leftSide());
+
+        if(dx < snapToPadding) {
+            if (min_x_snap === null) {
+                min_x_snap = dx;
+                new_x = nodes[i].leftSide() - node.rightOffset();
+            } else if (dx < min_x_snap) {
+                min_x_snap = dx;
+                new_x = nodes[i].rightSide() - node.rightOffset();
+            }
+        }
+
+        dx = Math.abs(node.leftSide() - nodes[i].rightSide());
+
+        if(dx < snapToPadding) {
+            if (min_x_snap === null) {
+                min_x_snap = dx;
+                new_x = nodes[i].leftSide() - node.leftOffset();
+            } else if (dx < min_x_snap) {
+                min_x_snap = dx;
+                new_x = nodes[i].leftSide() - node.leftOffset();
+            }
+        }
+
+        dx = Math.abs(node.rightSide() - nodes[i].rightSide());
+
+        if(dx < snapToPadding) {
+            if (min_x_snap === null) {
+                min_x_snap = dx;
+                new_x = nodes[i].rightSide() - node.rightOffset();
+            } else if (dx < min_x_snap) {
+                min_x_snap = dx;
+                new_x = nodes[i].rightSide() - node.rightOffset();
+            }
+        }
+
+        dx = Math.abs(node.leftSide() - nodes[i].leftSide());
+
+        if(dx < snapToPadding) {
+            if (min_x_snap === null) {
+                min_x_snap = dx;
+                new_x = nodes[i].leftSide() - node.leftOffset();
+            } else if (dx < min_x_snap) {
+                min_x_snap = dx;
+                new_x = nodes[i].leftSide() - node.leftOffset();
+            }
         }
 
         if(Math.abs(node.y - nodes[i].y) < snapToPadding) {
-            node.y = nodes[i].y;
+            new_y = nodes[i].y;
         }
+    }
+    if (new_y !== null) node.y = new_y;
+    if (new_x !== null) {
+
+        node.x = new_x;
     }
 }
 
