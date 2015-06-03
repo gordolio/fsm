@@ -44,7 +44,7 @@ function Toolbox () {
     this.height = function(_) {
         if (arguments.length) {
             this._height = _;
-            if (this.selection)
+            if (this.selection && this.selection.nodeType != TEXT_NODE_T)
                 this.selection.height = this._height;
             if (this.height_element)
                 this.height_element.value = this._height;
@@ -55,7 +55,7 @@ function Toolbox () {
     this.radius = function(_) {
         if (arguments.length) {
             this._radius = _;
-            if (this.selection)
+            if (this.selection && this.selection.nodeType != TEXT_NODE_T)
                 this.selection.radius = this._radius;
             if (this.radius_element)
                 this.radius_element.value = this._radius;
@@ -66,7 +66,7 @@ function Toolbox () {
     this.width = function(_) {
         if (arguments.length) {
             this._width = _;
-            if (this.selection)
+            if (this.selection && this.selection.nodeType != TEXT_NODE_T)
                 this.selection.width = this._width;
             if (this.width_element)
                 this.width_element.value = this._width;
@@ -138,6 +138,9 @@ Toolbox.prototype.disable_tools = function () {
 }
 
 Toolbox.prototype.enable_tools = function () {
+    if (this.selection && this.selection.nodeType === TEXT_NODE_T) {
+        return;
+    }
     if (this.radius_element)
         this.radius_element.disabled = false;
     if (this.width_element)

@@ -193,6 +193,13 @@ function Node(x, y) {
     this.height = 60;
 }
 
+Node.prototype.updateTextWidth = function () {
+    var c = canvas.getContext('2d');
+    c.font = '20px "Times New Romain", serif';
+    this.width = Math.max(5, c.measureText(this.text).width);
+    console.log("this.width => ", this.width);
+};
+
 Node.prototype.setMouseStart = function(x, y) {
     this.mouseOffsetX = this.x - x;
     this.mouseOffsetY = this.y - y;
@@ -246,25 +253,39 @@ Node.prototype.draw = function(c) {
 
         drawText(c, this.text, this.x, this.y, null, selectedObject == this);
     } else if (this.nodeType == TEXT_NODE_T) {
-        drawText(c, this.text, this.x, this.y, null, selectedObject == this);
-
+        if (selectedObject == this) {
+            var prev_strokestyle = c.strokeStyle;
+            c.strokeStyle = 'grey';
+            c.beginPath();
+            c.strokeRect(this.x, this.y - this.height / 2.0, this.width, this.height);
+            c.stroke();
+            c.strokeStyle = prev_strokestyle;
+        }
+        drawText(c, this.text, this.x, this.y, null, selectedObject == this, false);
     }
 };
 
 Node.prototype.closestPointOnCircle = function(x, y) {
-    var dx = x - this.x;
-    var dy = y - this.y;
+
+    var this_x = this.x,
+        this_y = this.y;
+
+    if (this.nodeType == TEXT_NODE_T) {
+        this_x = this_x + this.width / 2.0;
+    }
+
+    var dx = x - this_x;
+    var dy = y - this_y;
     var distance = Math.sqrt(dx * dx + dy * dy);
 
-
     if (this.nodeType == RECTANGE_NODE_T || this.nodeType == TEXT_NODE_T) {
-        var dy = x - this.x,
-            dx = y - this.y;
+        var dx = x - this_x,
+            dy = y - this_y;
         // angle is 0  when point is to the right of rectangle,
         // angle is pi when point is to left of rectangle.
         var angle = (2.0 * Math.PI + Math.atan2(
-            dy,
-            dx
+            dx,
+            dy
         ) - (Math.PI / 2.0)) % (2.0 * Math.PI);
         var tan = Math.tan(angle);
         var h = distance * Math.sin(angle);
@@ -299,14 +320,14 @@ Node.prototype.closestPointOnCircle = function(x, y) {
             };
         }
         return {
-            'x': this.x + w,
-            'y': this.y - h,
+            'x': this_x + w,
+            'y': this_y - h,
         };
     } else {
 
         return {
-            'x': this.x + dx * this.radius / distance,
-            'y': this.y + dy * this.radius / distance,
+            'x': this_x + dx * this.radius / distance,
+            'y': this_y + dy * this.radius / distance,
         };
     }
 };
@@ -730,6 +751,7 @@ function drawText(c, originalText, x, y, angleOrNull, isSelected, alignCenter) {
 
     if (alignCenter === undefined )
         alignCenter = true;
+
     if (alignCenter) {
         // center the text
         x -= width / 2;
@@ -899,6 +921,11 @@ window.onload = function() {
         } else if(selectedObject instanceof Node) {
             selectedObject.nodeType += 1;
             selectedObject.nodeType = selectedObject.nodeType % (MAX_NODE_T);
+
+            if (selectedObject.nodeType == TEXT_NODE_T) {
+                selectedObject.updateTextWidth();
+            }
+
             draw();
         }
     };
@@ -939,8 +966,10 @@ window.onload = function() {
         }
 
         if (resizingObject) {
-            selectedObject.setNewRadius(mouse.x, mouse.y);
-            draw();
+            if (selectedObject.nodeType !== TEXT_NODE_T) {
+                selectedObject.setNewRadius(mouse.x, mouse.y);
+                draw();
+            }
         }
     };
 
@@ -977,6 +1006,11 @@ document.onkeydown = function(e) {
         if(selectedObject != null && 'text' in selectedObject) {
             selectedObject.text = selectedObject.text.substr(0, selectedObject.text.length - 1);
             resetCaret();
+
+            if (selectedObject.nodeType == TEXT_NODE_T) {
+                selectedObject.updateTextWidth();
+            }
+
             draw();
         }
 
@@ -995,6 +1029,11 @@ document.onkeydown = function(e) {
                 }
             }
             selectedObject = null;
+
+            if (selectedObject.nodeType == TEXT_NODE_T) {
+                selectedObject.updateTextWidth();
+            }
+
             draw();
         }
     }
@@ -1018,6 +1057,9 @@ document.onkeypress = function(e) {
     } else if(key >= 0x20 && key <= 0x7E && !e.metaKey && !e.altKey && !e.ctrlKey && selectedObject != null && 'text' in selectedObject) {
         selectedObject.text += String.fromCharCode(key);
         resetCaret();
+        if (selectedObject.nodeType == TEXT_NODE_T) {
+            selectedObject.updateTextWidth();
+        }
         draw();
 
         // don't let keys do their actions (like space scrolls down the page)
