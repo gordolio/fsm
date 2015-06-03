@@ -178,7 +178,8 @@ var CIRCLE_NODE_T       = 0,
     ACCEPT_STATE_NODE_T = 1,
     RECTANGE_NODE_T     = 2,
     TRIANGLE_NODE_T     = 3,
-    MAX_NODE_T          = 4;
+    TEXT_NODE_T         = 4,
+    MAX_NODE_T          = 5;
 
 function Node(x, y) {
     this.x = x;
@@ -244,6 +245,9 @@ Node.prototype.draw = function(c) {
         c.stroke();
 
         drawText(c, this.text, this.x, this.y, null, selectedObject == this);
+    } else if (this.nodeType == TEXT_NODE_T) {
+        drawText(c, this.text, this.x, this.y, null, selectedObject == this);
+
     }
 };
 
@@ -251,7 +255,9 @@ Node.prototype.closestPointOnCircle = function(x, y) {
     var dx = x - this.x;
     var dy = y - this.y;
     var distance = Math.sqrt(dx * dx + dy * dy);
-    if (this.nodeType == RECTANGE_NODE_T) {
+
+
+    if (this.nodeType == RECTANGE_NODE_T || this.nodeType == TEXT_NODE_T) {
         var dy = x - this.x,
             dx = y - this.y;
         // angle is 0  when point is to the right of rectangle,
@@ -717,13 +723,17 @@ function canvasHasFocus() {
     return (document.activeElement || document.body) == document.body;
 }
 
-function drawText(c, originalText, x, y, angleOrNull, isSelected) {
+function drawText(c, originalText, x, y, angleOrNull, isSelected, alignCenter) {
     text = convertLatexShortcuts(originalText);
     c.font = '20px "Times New Roman", serif';
     var width = c.measureText(text).width;
 
-    // center the text
-    x -= width / 2;
+    if (alignCenter === undefined )
+        alignCenter = true;
+    if (alignCenter) {
+        // center the text
+        x -= width / 2;
+    }
 
     // position the text intelligently if given an angle
     if(angleOrNull != null) {
