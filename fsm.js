@@ -313,6 +313,14 @@ Node.prototype.draw = function(c) {
         }
         drawText(c, this.text, this.x, this.y, null, selectedObject == this, true);
     }
+    if (selectedObject == this && snapInfo.x) {
+        var prev_strokestyle = c.strokeStyle;
+        c.strokeStyle = 'yellow';
+        c.beginPath();
+        c.moveTo(this.x, 0);
+
+        c.strokeStyle = prev_strokestyle;
+    }
 };
 
 Node.prototype.closestPointOnCircle = function(x, y) {
@@ -888,7 +896,8 @@ var selectedObject = null; // either a Link or a Node
 var currentLink = null; // a Link
 var movingObject = false,
     resizingObject = false,
-    alt_resizes = false;
+    alt_resizes = false,
+    snapInfo = {x:false, y:false};
 var originalClick;
 
 function drawUsing(c) {
@@ -989,6 +998,8 @@ function snapNode(node) {
     }
     if (new_dy !== null) node.y = node.y + new_dy;
     if (new_dx !== null) node.x = node.x + new_dx;
+
+    return {y: new_dy !== null, x: new_dx !== null};
 }
 
 window.onload = function() {
@@ -1068,6 +1079,7 @@ window.onload = function() {
 
     canvas.onmousemove = function(e) {
         var mouse = crossBrowserRelativeMousePos(e);
+        snapInfo = {x:false,y:false};
 
         if(currentLink != null) {
             var targetNode = selectObject(mouse.x, mouse.y);
@@ -1096,7 +1108,7 @@ window.onload = function() {
         if(movingObject) {
             selectedObject.setAnchorPoint(mouse.x, mouse.y);
             if(selectedObject instanceof Node) {
-                snapNode(selectedObject);
+                snapInfo = snapNode(selectedObject);
             }
             draw();
         }
