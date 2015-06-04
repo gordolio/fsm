@@ -247,7 +247,6 @@ Node.prototype.updateTextWidth = function () {
     var c = canvas.getContext('2d');
     c.font = '20px "Times New Romain", serif';
     this.width = Math.max(5, c.measureText(this.text).width);
-    console.log("this.width => ", this.width);
 };
 
 Node.prototype.setMouseStart = function(x, y) {
@@ -318,7 +317,8 @@ Node.prototype.draw = function(c) {
         c.strokeStyle = 'yellow';
         c.beginPath();
         c.moveTo(this.x, 0);
-
+        c.lineTo(this.x, canvas.height);
+        c.stroke();
         c.strokeStyle = prev_strokestyle;
     }
 };
