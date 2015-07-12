@@ -1,11 +1,12 @@
 <!doctype html>
 <html>
     <head>
-    <title>Diagram Designer - by Evan Wallace</title>
-    <meta charset="utf-8">
-    <link rel="stylesheet" href="style.css"  type="text/css" />
-    <script src="fsm.js"></script>
-    <script src="app.js"></script>
+        <title>Diagram Designer - by Evan Wallace</title>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="style.css"  type="text/css" />
+        <script src="react-with-addons.js"></script>
+        <script src="fsm.js"></script>
+        <script src="app.js"></script>
     </head>
     <body>
         <h1>Diagram Designer</h1>
@@ -14,6 +15,9 @@
                 <li class="radius_li"><input type="number" class="radius"/></li>
                 <li class="width_li"><input type="number" class="width"/></li>
                 <li class="height_li"><input type="number" class="height"/></li>
+                <li class="shape_li">
+                    <div class="shape"></div>
+                </li>
             </ul>
         </div>
         <canvas id="canvas" width="800" height="600">

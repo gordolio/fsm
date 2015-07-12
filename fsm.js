@@ -26,6 +26,8 @@
  OTHER DEALINGS IN THE SOFTWARE.
 */
 
+var SNAP_COLOR = "#fff82c";
+
 function sign(x) { return (x >> 31) + (x > 0 ? 1 : 0); }
 
 function Link(a, b) {
@@ -314,10 +316,19 @@ Node.prototype.draw = function(c) {
     }
     if (selectedObject == this && snapInfo.x) {
         var prev_strokestyle = c.strokeStyle;
-        c.strokeStyle = 'yellow';
+        c.strokeStyle = SNAP_COLOR;
         c.beginPath();
-        c.moveTo(this.x, 0);
-        c.lineTo(this.x, canvas.height);
+        c.moveTo(snapInfo.x_snap, 0);
+        c.lineTo(snapInfo.x_snap, canvas.height);
+        c.stroke();
+        c.strokeStyle = prev_strokestyle;
+    }
+    if (selectedObject == this && snapInfo.y) {
+        var prev_strokestyle = c.strokeStyle;
+        c.strokeStyle = SNAP_COLOR;
+        c.beginPath();
+        c.moveTo(0, snapInfo.y_snap);
+        c.lineTo(canvas.width, snapInfo.y_snap);
         c.stroke();
         c.strokeStyle = prev_strokestyle;
     }
@@ -424,7 +435,7 @@ Node.prototype.containsPoint = function(x, y) {
 
 
 
-    
+
 };
 
 function SelfLink(node, mouse) {
@@ -888,7 +899,7 @@ function resetCaret() {
 var canvas;
 var nodes = [];
 var links = [];
-
+var figurename = "Untitled";
 var cursorVisible = true;
 var snapToPadding = 6; // pixels
 var hitTargetPadding = 6; // pixels
@@ -897,7 +908,12 @@ var currentLink = null; // a Link
 var movingObject = false,
     resizingObject = false,
     alt_resizes = false,
-    snapInfo = {x:false, y:false};
+    snapInfo = {
+        x:false,
+        y:false,
+        y_snap: null,
+        x_snap: null
+    };
 var originalClick;
 
 function drawUsing(c) {
@@ -947,51 +963,57 @@ function snapNode(node) {
     var min_x_snap = null,
         min_y_snap = null,
         new_dx     = null,
-        new_dy     = null;
+        new_dy     = null,
+        y_snap     = null,
+        x_snap     = null;
 
     for(var i = 0; i < nodes.length; i++) {
         if (nodes[i] == node) continue;
 
         var deltaxs = [
-            nodes[i].x           - node.x,
-            nodes[i].leftSide()  - node.x,
-            nodes[i].rightSide() - node.x,
-            nodes[i].leftSide()  - node.rightSide(),
-            nodes[i].rightSide() - node.leftSide(),
-            nodes[i].rightSide() - node.rightSide(),
-            nodes[i].leftSide()  - node.leftSide()
+            [nodes[i].x           - node.x,           nodes[i].x],
+            [nodes[i].leftSide()  - node.x,           nodes[i].leftSide()],
+            [nodes[i].rightSide() - node.x,           nodes[i].rightSide()],
+            [nodes[i].leftSide()  - node.rightSide(), nodes[i].leftSide()],
+            [nodes[i].rightSide() - node.leftSide(),  nodes[i].rightSide()],
+            [nodes[i].rightSide() - node.rightSide(), nodes[i].rightSide()],
+            [nodes[i].leftSide()  - node.leftSide(),  nodes[i].leftSide()]
         ];
 
         for (var deltaxs_idx = 0; deltaxs_idx < deltaxs.length;deltaxs_idx++) {
-            var delta_x = Math.abs(deltaxs[deltaxs_idx]);
+            var delta_x = Math.abs(deltaxs[deltaxs_idx][0]);
             if (delta_x < snapToPadding) {
                 if (min_x_snap === null) {
                     min_x_snap = delta_x;
-                    new_dx = deltaxs[deltaxs_idx];
+                    new_dx = deltaxs[deltaxs_idx][0];
+                    x_snap = deltaxs[deltaxs_idx][1];
                 } else if (delta_x < min_x_snap) {
                     min_x_snap = delta_x;
-                    new_dx = deltaxs[deltaxs_idx];
+                    new_dx = deltaxs[deltaxs_idx][0];
+                    x_snap = deltaxs[deltaxs_idx][1];
                 }
             }
         }
 
         var deltays = [
-            nodes[i].y             - node.y,
-            nodes[i].bottomSide()  - node.topSide(),
-            nodes[i].topSide()     - node.bottomSide(),
-            nodes[i].topSide()     - node.topSide(),
-            nodes[i].bottomSide()  - node.bottomSide()
+            [nodes[i].y            - node.y,            nodes[i].y],
+            [nodes[i].bottomSide() - node.topSide(),    nodes[i].bottomSide()],
+            [nodes[i].topSide()    - node.bottomSide(), nodes[i].topSide()],
+            [nodes[i].topSide()    - node.topSide(),    nodes[i].topSide()],
+            [nodes[i].bottomSide() - node.bottomSide(), nodes[i].bottomSide()],
         ];
 
         for (var deltays_idx = 0; deltays_idx < deltays.length;deltays_idx++) {
-            var delta_y = Math.abs(deltays[deltays_idx]);
+            var delta_y = Math.abs(deltays[deltays_idx][0]);
             if (delta_y < snapToPadding) {
                 if (min_y_snap === null) {
                     min_y_snap = delta_y;
-                    new_dy = deltays[deltays_idx];
+                    new_dy = deltays[deltays_idx][0];
+                    y_snap = deltays[deltays_idx][1];
                 } else if (delta_y < min_y_snap) {
                     min_y_snap = delta_y;
-                    new_dy = deltays[deltays_idx];
+                    new_dy = deltays[deltays_idx][0];
+                    y_snap = deltays[deltays_idx][1];
                 }
             }
         }
@@ -999,7 +1021,12 @@ function snapNode(node) {
     if (new_dy !== null) node.y = node.y + new_dy;
     if (new_dx !== null) node.x = node.x + new_dx;
 
-    return {y: new_dy !== null, x: new_dx !== null};
+    return {
+        y: new_dy !== null,
+        y_snap: y_snap,
+        x: new_dx !== null,
+        x_snap: x_snap
+    };
 }
 
 window.onload = function() {
@@ -1079,7 +1106,7 @@ window.onload = function() {
 
     canvas.onmousemove = function(e) {
         var mouse = crossBrowserRelativeMousePos(e);
-        snapInfo = {x:false,y:false};
+        snapInfo = {x:false,y:false,y_snap:null,x_snap:null};
 
         if(currentLink != null) {
             var targetNode = selectObject(mouse.x, mouse.y);
@@ -1315,44 +1342,54 @@ function restoreBackup() {
     }
 
     try {
-        var backup = JSON.parse(localStorage['fsm']);
+        var all_backup = JSON.parse(localStorage['fsm']) || {};
 
-        for(var i = 0; i < backup.nodes.length; i++) {
-            var backupNode = backup.nodes[i];
-            var node = new Node(backupNode.x, backupNode.y);
-            node.nodeType = backupNode.nodeType;
-            node.radius = backupNode.radius || 30.0;
-            node.width  = backupNode.width  || 60.0;
-            node.height = backupNode.height || 60.0;
-            node.text = backupNode.text;
-            nodes.push(node);
-        }
-        for(var i = 0; i < backup.links.length; i++) {
-            var backupLink = backup.links[i];
-            var link = null;
-            if(backupLink.type == 'SelfLink') {
-                link = new SelfLink(nodes[backupLink.node]);
-                link.anchorAngle = backupLink.anchorAngle;
-                link.text = backupLink.text;
-            } else if(backupLink.type == 'StartLink') {
-                link = new StartLink(nodes[backupLink.node]);
-                link.deltaX = backupLink.deltaX;
-                link.deltaY = backupLink.deltaY;
-                link.text = backupLink.text;
-            } else if(backupLink.type == 'Link') {
-                link = new Link(nodes[backupLink.nodeA], nodes[backupLink.nodeB]);
-                link.parallelPart = backupLink.parallelPart;
-                link.perpendicularPart = backupLink.perpendicularPart;
-                link.text = backupLink.text;
-                link.lineAngleAdjust = backupLink.lineAngleAdjust;
+        if (all_backup[figurename] !== undefined) {
+            var backup = all_backup[figurename];
+
+            for(var i = 0; i < backup.nodes.length; i++) {
+                var backupNode = backup.nodes[i];
+                var node = new Node(backupNode.x, backupNode.y);
+                node.nodeType = backupNode.nodeType;
+                node.radius = backupNode.radius || 30.0;
+                node.width  = backupNode.width  || 60.0;
+                node.height = backupNode.height || 60.0;
+                node.text = backupNode.text;
+                nodes.push(node);
             }
-            if(link != null) {
-                links.push(link);
+            for(var i = 0; i < backup.links.length; i++) {
+                var backupLink = backup.links[i];
+                var link = null;
+                if(backupLink.type == 'SelfLink') {
+                    link = new SelfLink(nodes[backupLink.node]);
+                    link.anchorAngle = backupLink.anchorAngle;
+                    link.text = backupLink.text;
+                } else if(backupLink.type == 'StartLink') {
+                    link = new StartLink(nodes[backupLink.node]);
+                    link.deltaX = backupLink.deltaX;
+                    link.deltaY = backupLink.deltaY;
+                    link.text = backupLink.text;
+                } else if(backupLink.type == 'Link') {
+                    link = new Link(nodes[backupLink.nodeA], nodes[backupLink.nodeB]);
+                    link.parallelPart = backupLink.parallelPart;
+                    link.perpendicularPart = backupLink.perpendicularPart;
+                    link.text = backupLink.text;
+                    link.lineAngleAdjust = backupLink.lineAngleAdjust;
+                }
+                if(link != null) {
+                    links.push(link);
+                }
             }
         }
     } catch(e) {
         localStorage['fsm'] = '';
     }
+}
+
+function addToBackup(newfig, newfigname) {
+    var cur_backup = JSON.parse(localStorage['fsm']) || {};
+    cur_backup[newfigname] = newfig;
+    localStorage['fsm'] = JSON.stringify(cur_backup);
 }
 
 function saveBackup() {
@@ -1411,6 +1448,6 @@ function saveBackup() {
         }
     }
 
-    localStorage['fsm'] = JSON.stringify(backup);
+    addToBackup(backup, figurename);
 }
 

@@ -31,6 +31,90 @@ if (typeof btoa == 'undefined') {
     }
 }
 
+function getActiveOption(opts) {
+    var opt = null;
+    for (var i = 0; i < opts.length; i++) {
+        if (opts[i].active) opt = opts[i].name;
+        break;
+    }
+    return opt;
+}
+
+var DropDown = React.createClass({displayName: 'DropDown',
+    mixins: [React.addons.PureRenderMixin],
+    getInitialState: function () {
+        return {
+            active: false,
+            active_option: getActiveOption(this.props.options) || this.props.placeholder
+        };
+    },
+    remove_background_callback: function () {
+        document.removeEventListener('click', this.documentClickHandler);
+    },
+    add_background_callback: function () {
+        document.addEventListener('click', this.documentClickHandler);
+    },
+    documentClickHandler: function (e) {
+        this.setState({
+            active: false
+        });
+    },
+    toggleDropDown: function(e) {
+        if (arguments.length > 0) {
+            e.stopImmediatePropagation();
+        }
+        if (this.state.active) {
+            this.remove_background_callback();
+        } else {
+            this.add_background_callback();
+        }
+
+        this.setState({
+            active: this.state.active ? false : true
+        });
+    },
+    choose_dropdown_item: function (option) {
+        this.toggleDropDown();
+        this.setState({"active_option": option});
+        this.props.onChange(option);
+    },
+    dropdown_click: function (e) {
+        e.stopPropagation();
+        e.nativeEvent.stopImmediatePropagation();
+        this.toggleDropDown();
+    },
+    render: function () {
+        var options = this.props.options.map( function (op, i) {
+            if (op.active) {
+                current_active = op.name;
+            }
+            var cb = function (e) {
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+                this.choose_dropdown_item(op.name);
+            }.bind(this);
+            return (
+                React.createElement("li", {key: "op_" + i, onClick: cb},
+                    React.createElement("a", {className: op.name == this.state.active_option ? "active" : ""}, op.name)
+                )
+            );
+        }.bind(this));
+        return (
+            React.createElement("li", null,
+                React.createElement("a", {className: "dropdown-button",
+                   href: "#!",
+                   onClick: this.dropdown_click},
+                   this.state.active_option,
+                   React.createElement("i", {className: "mdi-navigation-arrow-drop-down right"})
+                ),
+                React.createElement("ul", {className: "dropdown-inner" + (this.state.active ? " active" : ""), ref: "dropdown"},
+                    options
+                )
+            )
+        );
+    }
+});
+
 function Toolbox () {
     this.selection = null;
 
@@ -40,6 +124,7 @@ function Toolbox () {
     this._height        = 60;
     this.radius_element = null;
     this._radius        = 30;
+    this.shape_element  = null;
 
     this.height = function(_) {
         if (arguments.length) {
@@ -106,6 +191,31 @@ Toolbox.prototype.set_height_element = function (el) {
         toolbox.height(parseInt(this.value));
         draw();
     });
+};
+
+Toolbox.prototype.set_shape_element = function (el) {
+    var toolbox = this;
+    toolbox.shape_element = el;
+
+    React.render(
+        React.createElement(DropDown,
+            {
+                options: [
+                        {name:"hello", active:true},
+                        {name:"yo", active:false}
+                ],
+                onChange: function (opname) {
+                }
+            }
+        ),
+        toolbox.shape_element
+    );
+    /*
+    OnChange(toolbox.shape_element, function (e) {
+        toolbox.height(parseInt(this.value));
+        draw();
+    });
+    */
 };
 
 Toolbox.prototype.set_radius_element = function (el) {
@@ -197,6 +307,10 @@ window.onload = function () {
         var width_node = toolbox_el.getElementsByClassName("width");
         if (width_node)
             toolbox.set_width_element(width_node[0]);
+
+        var shape_node = toolbox_el.getElementsByClassName("shape");
+        if (shape_node)
+            toolbox.set_shape_element(shape_node[0]);
     }
     prev_onload();
 };
