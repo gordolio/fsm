@@ -1162,6 +1162,13 @@ window.onload = function() {
             draw();
         }
     };
+
+	document.getElementById('clear').addEventListener('click', function(e) {
+		nodes = [];
+		links = [];
+		resetCaret();
+		draw();
+	});
 }
 
 var shift = false,
