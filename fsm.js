@@ -1387,7 +1387,14 @@ function restoreBackup() {
 }
 
 function addToBackup(newfig, newfigname) {
-    var cur_backup = JSON.parse(localStorage['fsm']) || {};
+    var fsmStorage = localStorage['fsm'];
+    var cur_backup;
+    if(!fsmStorage) {
+       cur_backup = {};
+       return;
+    } else {
+       cur_backup = JSON.parse(fsmStorage);
+    }
     cur_backup[newfigname] = newfig;
     localStorage['fsm'] = JSON.stringify(cur_backup);
 }
